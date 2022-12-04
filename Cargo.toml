@@ -1,0 +1,29 @@
+[package]
+name = "redismod"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[workspace]
+members = ["examples/simple"]
+
+[dependencies.thiserror]
+version = "1"
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+
+[dependencies.log]
+version = "0.4.0"
+features = ["std", "kv_unstable"]
+
+[dependencies.once_cell]
+version = "1.14.0"
+
+[dependencies.redis-module]
+features = ["experimental-api"]
+branch = "feature/native-types"
+git = "https://github.com/bmartynov/redismodule-rs"
