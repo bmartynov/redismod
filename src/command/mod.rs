@@ -1,6 +1,6 @@
 use std::{ffi, ffi::CString};
 
-use redis_module::{decode_args, raw, Context, RedisError, RedisResult, RedisString, Status};
+use redis_module::{decode_args, raw, Context, RedisError, RedisString, RedisValue, Status};
 
 use crate::Module;
 
@@ -17,9 +17,9 @@ pub trait Handler<R: TryFromArgs>: Module {
     const FLAGS: &'static str;
     const KEYS: CommandKeys;
 
-    type Result: Into<RedisResult>;
+    type Result: Into<RedisValue>;
 
-    fn handle(&self, ctx: &Context, req: R) -> Self::Result;
+    fn handle(&self, ctx: &Context, req: R) -> Result<Self::Result, RedisError>;
 }
 
 pub struct CommandKeys {
@@ -103,9 +103,10 @@ where
         Err(err) => return ctx.reply(Err(err)) as ffi::c_int,
     };
 
-    let result = instance.handle(ctx, req);
-
-    ctx.reply(result.into()) as ffi::c_int
+    (match instance.handle(ctx, req) {
+        Err(err) => ctx.reply(Err(err)),
+        Ok(value) => ctx.reply(Ok(value.into())),
+    }) as ffi::c_int
 }
 
 // adapted from core/src/fmt/cmds tuple
