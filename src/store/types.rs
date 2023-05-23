@@ -1,10 +1,11 @@
 use std::{ffi, fmt, ptr};
 
-use redis_module as rm;
+use redis_module::{error::Error, native_types, raw, Context};
 
-use crate::{IOLoader, IOSaver, Store, Stores};
+use crate::store::{Store, Stores};
+use super::{IOLoader, IOSaver};
 
-pub trait Type: Sized {
+pub trait Type: Sized + RDBLoadSave {
     type IDType: fmt::Display;
 
     const NAME: &'static str;
@@ -13,76 +14,55 @@ pub trait Type: Sized {
     const REDIS_NAME: &'static str;
     const REDIS_VERSION: i32;
 
-    fn free(value: Box<Self>);
+    const KEY_PREFIX: &'static str;
+
+    #[inline]
+    fn key(id: &Self::IDType) -> String {
+        format!("{}{}", Self::KEY_PREFIX, id)
+    }
+
+    fn free(_value: Box<Self>) {}
     fn mem_usage(value: &Self) -> usize;
-    fn rdb_save(saver: &IOSaver, value: &Self);
-    fn rdb_load(loader: &IOLoader, encver: usize) -> Result<Self, rm::error::Error>;
 }
 
-pub trait Types: Sized {
+pub trait RDBLoadSave: Sized {
+    fn rdb_save(saver: &IOSaver, value: &Self);
+    fn rdb_load(loader: &IOLoader, encver: usize) -> Result<Self, Error>;
+}
+
+pub trait DataTypes: Sized {
     type Stores: Stores;
 
     fn create() -> Self::Stores;
 }
 
-impl Types for () {
+impl DataTypes for () {
     type Stores = ();
 
     fn create() -> Self::Stores {}
 }
 
 pub unsafe trait TypeMethods {
-    fn redis_type() -> rm::native_types::RedisType;
-    fn type_methods() -> rm::RedisModuleTypeMethods {
-        let version: u64 = rm::REDISMODULE_TYPE_METHOD_VERSION.into();
-
-        let free: rm::RedisModuleTypeFreeFunc = Some(<Self as TypeMethods>::free);
-        let rdb_load: rm::RedisModuleTypeLoadFunc = Some(<Self as TypeMethods>::rdb_load);
-        let rdb_save: rm::RedisModuleTypeSaveFunc = Some(<Self as TypeMethods>::rdb_save);
-
-        rm::RedisModuleTypeMethods {
-            version,
-            free,
-            rdb_load,
-            rdb_save,
-            aof_rewrite: None,
-            // Currently unused by Redis
-            mem_usage: None,
-            digest: None,
-            // Aux data
-            aux_load: None,
-            aux_save: None,
-            aux_save_triggers: 0,
-            free_effort: None,
-            unlink: None,
-            copy: None,
-            defrag: None,
-
-            copy2: None,
-            unlink2: None,
-            free_effort2: None,
-            mem_usage2: None,
-        }
-    }
+    fn redis_type() -> native_types::RedisType;
 
     unsafe extern "C" fn free(value: *mut ffi::c_void);
     unsafe extern "C" fn mem_usage(value: *const ffi::c_void) -> usize;
-    unsafe extern "C" fn rdb_save(_rdb: *mut rm::RedisModuleIO, _value: *mut ffi::c_void);
+    unsafe extern "C" fn rdb_save(rdb: *mut raw::RedisModuleIO, value: *mut ffi::c_void);
     unsafe extern "C" fn rdb_load(
-        _rdb: *mut rm::RedisModuleIO,
-        _encver: ffi::c_int,
+        rdb: *mut raw::RedisModuleIO,
+        encver: ffi::c_int,
     ) -> *mut ffi::c_void;
 }
 
 unsafe impl<T: Type> TypeMethods for T {
-    fn redis_type() -> rm::native_types::RedisType {
-        let version: u64 = rm::REDISMODULE_TYPE_METHOD_VERSION.into();
+    fn redis_type() -> native_types::RedisType {
+        let version: u64 = raw::REDISMODULE_TYPE_METHOD_VERSION.into();
 
-        let free: rm::RedisModuleTypeFreeFunc = Some(<Self as TypeMethods>::free);
-        let rdb_load: rm::RedisModuleTypeLoadFunc = Some(<Self as TypeMethods>::rdb_load);
-        let rdb_save: rm::RedisModuleTypeSaveFunc = Some(<Self as TypeMethods>::rdb_save);
+        let free: raw::RedisModuleTypeFreeFunc = Some(<Self as TypeMethods>::free);
+        let rdb_load: raw::RedisModuleTypeLoadFunc = Some(<Self as TypeMethods>::rdb_load);
+        let rdb_save: raw::RedisModuleTypeSaveFunc = Some(<Self as TypeMethods>::rdb_save);
 
-        let type_methods = rm::RedisModuleTypeMethods {
+        let type_methods = raw::RedisModuleTypeMethods {
             version,
             free,
             rdb_load,
@@ -106,7 +86,7 @@ unsafe impl<T: Type> TypeMethods for T {
             mem_usage2: None,
         };
 
-        rm::native_types::RedisType::new(Self::REDIS_NAME, Self::REDIS_VERSION, type_methods)
+        native_types::RedisType::new(Self::REDIS_NAME, Self::REDIS_VERSION, type_methods)
     }
 
     unsafe extern "C" fn free(value: *mut ffi::c_void) {
@@ -121,7 +101,7 @@ unsafe impl<T: Type> TypeMethods for T {
         T::mem_usage(value)
     }
 
-    unsafe extern "C" fn rdb_save(rdb: *mut rm::RedisModuleIO, value: *mut ffi::c_void) {
+    unsafe extern "C" fn rdb_save(rdb: *mut raw::RedisModuleIO, value: *mut ffi::c_void) {
         let saver = IOSaver { rdb };
         let value = &*value.cast::<T>();
 
@@ -129,7 +109,7 @@ unsafe impl<T: Type> TypeMethods for T {
     }
 
     unsafe extern "C" fn rdb_load(
-        rdb: *mut rm::RedisModuleIO,
+        rdb: *mut raw::RedisModuleIO,
         encver: ffi::c_int,
     ) -> *mut ffi::c_void {
         let loader = IOLoader { rdb };
@@ -139,16 +119,16 @@ unsafe impl<T: Type> TypeMethods for T {
             Err(_err) => return ptr::null_mut(),
         };
 
-        Box::into_raw(Box::new(loaded)) as *mut ffi::c_void
+        Box::into_raw(Box::new(loaded)).cast::<ffi::c_void>()
     }
 }
 
-// adapted from core/src/fmt/mod.rs tuple
+// adapted from core/src/fmt/cmds tuple
 macro_rules! tuple_types {
     () => ();
     ( $($name:ident,)+ ) => (
         impl<$($name: Type, )*> Stores for ($(Store<$name>, )*) {
-            fn register(&self, ctx: &rm::Context) -> Result<(), &str> {
+            fn register(&self, ctx: &Context) -> Result<(), &str> {
                 #[allow(non_snake_case)]
                 let ($(ref $name,)+) = self;
 
@@ -158,7 +138,7 @@ macro_rules! tuple_types {
             }
         }
 
-        impl<$($name: Type, )*> Types for ($($name, )*) {
+        impl<$($name: Type, )*> DataTypes for ($($name, )*) {
             type Stores = ($(Store<$name>, )*);
 
             fn create() -> Self::Stores {

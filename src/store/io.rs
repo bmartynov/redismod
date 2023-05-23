@@ -1,12 +1,14 @@
 use redis_module as rm;
 
+type Result<T> = std::result::Result<T, rm::error::Error>;
+
 pub trait Loader {
-    fn double(&self) -> Result<f64, rm::error::Error>;
-    fn float(&self) -> Result<f32, rm::error::Error>;
-    fn unsigned(&self) -> Result<u64, rm::error::Error>;
-    fn signed(&self) -> Result<i64, rm::error::Error>;
-    fn string(&self) -> Result<rm::RedisString, rm::error::Error>;
-    fn buffer(&self) -> Result<rm::RedisBuffer, rm::error::Error>;
+    fn double(&self) -> Result<f64>;
+    fn float(&self) -> Result<f32>;
+    fn unsigned(&self) -> Result<u64>;
+    fn signed(&self) -> Result<i64>;
+    fn string(&self) -> Result<rm::RedisString>;
+    fn buffer(&self) -> Result<rm::RedisBuffer>;
 }
 
 pub trait Saver {
@@ -23,22 +25,22 @@ pub struct IOLoader {
 }
 
 impl Loader for IOLoader {
-    fn double(&self) -> Result<f64, rm::error::Error> {
+    fn double(&self) -> Result<f64> {
         rm::load_double(self.rdb)
     }
-    fn float(&self) -> Result<f32, rm::error::Error> {
+    fn float(&self) -> Result<f32> {
         rm::load_float(self.rdb)
     }
-    fn unsigned(&self) -> Result<u64, rm::error::Error> {
+    fn unsigned(&self) -> Result<u64> {
         rm::load_unsigned(self.rdb)
     }
-    fn signed(&self) -> Result<i64, rm::error::Error> {
+    fn signed(&self) -> Result<i64> {
         rm::load_signed(self.rdb)
     }
-    fn string(&self) -> Result<rm::RedisString, rm::error::Error> {
+    fn string(&self) -> Result<rm::RedisString> {
         rm::load_string(self.rdb)
     }
-    fn buffer(&self) -> Result<rm::RedisBuffer, rm::error::Error> {
+    fn buffer(&self) -> Result<rm::RedisBuffer> {
         rm::load_string_buffer(self.rdb)
     }
 }
