@@ -1,4 +1,5 @@
-use std::{ffi, ffi::CString};
+use std::ffi;
+use std::ffi::CString;
 
 use redis_module::{decode_args, raw, Context, RedisError, RedisString, RedisValue, Status};
 

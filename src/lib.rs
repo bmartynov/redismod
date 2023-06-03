@@ -2,27 +2,19 @@ mod arg_ext;
 #[macro_use]
 mod macros;
 mod command;
-pub mod keyspace;
+// pub mod keyspace;
 mod logger;
 pub mod store;
-pub mod timer;
+// pub mod timer;
 
 use std::os::raw::{c_char, c_int};
 
-pub use redis_module as rm;
-pub use once_cell::sync::OnceCell as __OnceCell;
 pub use arg_ext::{FromArgs, NextArgExt};
 pub use command::{CommandKeys, Commands, Handler};
+pub use once_cell::sync::OnceCell as __OnceCell;
+pub use redis_module as rm;
 // reexport
-pub use redis_module::{
-    Context,
-    NextArg,
-    RedisError,
-    RedisResult,
-    RedisString,
-    RedisValue,
-    REDIS_OK,
-};
+pub use redis_module::{Context, NextArg, RedisError, RedisResult, RedisString, RedisValue, REDIS_OK};
 
 use crate::store::{DataTypes, Stores};
 
@@ -53,11 +45,7 @@ pub trait Module: Sized + Instance<Self> {
 
     fn start(&mut self, ctx: &Context) -> Result<(), Self::Error>;
 
-    fn create(
-        ctx: &Context,
-        config: Self::Config,
-        stores: store::ModuleStores<Self>,
-    ) -> Result<Self, Self::Error>;
+    fn create(ctx: &Context, config: Self::Config, stores: store::ModuleStores<Self>) -> Result<Self, Self::Error>;
 }
 
 pub fn on_unload<M: Module + 'static>(ctx: *mut rm::RedisModuleCtx) -> rm::Status {

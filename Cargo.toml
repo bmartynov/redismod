@@ -8,7 +8,17 @@ edition = "2021"
 [workspace]
 members = ["examples/simple"]
 
+
+[features]
+default = ["with_rkyv"]
+
+with_rkyv = ["rkyv"]
+
 [dependencies]
+
+[dependencies.rkyv]
+version = "0.7"
+optional = true
 
 [dependencies.thiserror]
 version = "1"
@@ -28,3 +38,4 @@ version = "1.14.0"
 features = ["experimental-api", "test"]
 branch = "feature/native-types"
 git = "https://github.com/bmartynov/redismodule-rs"
+#path = "/Users/boris/projects/rust/redismodule-rs"

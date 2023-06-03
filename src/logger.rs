@@ -1,5 +1,5 @@
-use redis_module as rm;
 use log::{self, Level, Metadata, Record};
+use redis_module as rm;
 
 struct RedisLogger;
 

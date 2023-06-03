@@ -1,33 +1,42 @@
-use std::{ffi, fmt, ptr};
+use std::borrow::Cow;
+use std::{ffi, ptr};
 
-use redis_module::{error::Error, native_types, raw, Context};
+use redis_module::{native_types, raw, Context, RedisString};
 
-use crate::store::{Store, Stores};
-use super::{IOLoader, IOSaver};
+use super::rdb::RDBLoadSave;
+use super::{IOLoader, IOSaver, Store, Stores};
 
-pub trait Type: Sized + RDBLoadSave {
-    type IDType: fmt::Display;
+pub trait AsKey {
+    fn as_key(&self, ctx: &Context) -> Cow<RedisString>;
+}
 
-    const NAME: &'static str;
-    const PREFIX: &'static str;
+impl AsKey for RedisString {
+    #[inline]
+    fn as_key(&self, _ctx: &Context) -> Cow<RedisString> {
+        Cow::Borrowed(self)
+    }
+}
+
+impl<ID: AsKey> AsKey for &ID {
+    #[inline]
+    fn as_key(&self, ctx: &Context) -> Cow<RedisString> {
+        (*self).as_key(ctx)
+    }
+}
+
+pub trait Type
+where
+    Self: Sized + RDBLoadSave,
+{
+    type ID: AsKey;
 
     const REDIS_NAME: &'static str;
     const REDIS_VERSION: i32;
 
-    const KEY_PREFIX: &'static str;
-
-    #[inline]
-    fn key(id: &Self::IDType) -> String {
-        format!("{}{}", Self::KEY_PREFIX, id)
-    }
+    fn id(&self) -> Self::ID;
 
     fn free(_value: Box<Self>) {}
     fn mem_usage(value: &Self) -> usize;
-}
-
-pub trait RDBLoadSave: Sized {
-    fn rdb_save(saver: &IOSaver, value: &Self);
-    fn rdb_load(loader: &IOLoader, encver: usize) -> Result<Self, Error>;
 }
 
 pub trait DataTypes: Sized {
@@ -48,10 +57,7 @@ pub unsafe trait TypeMethods {
     unsafe extern "C" fn free(value: *mut ffi::c_void);
     unsafe extern "C" fn mem_usage(value: *const ffi::c_void) -> usize;
     unsafe extern "C" fn rdb_save(rdb: *mut raw::RedisModuleIO, value: *mut ffi::c_void);
-    unsafe extern "C" fn rdb_load(
-        rdb: *mut raw::RedisModuleIO,
-        encver: ffi::c_int,
-    ) -> *mut ffi::c_void;
+    unsafe extern "C" fn rdb_load(rdb: *mut raw::RedisModuleIO, encver: ffi::c_int) -> *mut ffi::c_void;
 }
 
 unsafe impl<T: Type> TypeMethods for T {
@@ -108,10 +114,7 @@ unsafe impl<T: Type> TypeMethods for T {
         T::rdb_save(&saver, value)
     }
 
-    unsafe extern "C" fn rdb_load(
-        rdb: *mut raw::RedisModuleIO,
-        encver: ffi::c_int,
-    ) -> *mut ffi::c_void {
+    unsafe extern "C" fn rdb_load(rdb: *mut raw::RedisModuleIO, encver: ffi::c_int) -> *mut ffi::c_void {
         let loader = IOLoader { rdb };
 
         let loaded = match T::rdb_load(&loader, encver as usize) {

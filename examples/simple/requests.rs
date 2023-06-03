@@ -2,11 +2,10 @@ use std::time::Duration;
 
 use redis_module as rm;
 use redis_module::NextArg as _;
-
 use redismod::{CommandKeys, NextArgExt, RequestHandler};
 
-use crate::ExampleModule;
 use crate::types::{Task, TaskState};
+use crate::ExampleModule;
 
 #[derive(Debug)]
 pub struct TaskCreate {

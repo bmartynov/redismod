@@ -3,11 +3,9 @@ mod requests;
 mod types;
 
 use redis_module as rm;
-
 use redismod::{module, Module, ModuleStores, Store};
-
-use types::Task;
 use requests::TaskCreate;
+use types::Task;
 
 module![ExampleModule];
 
@@ -37,11 +35,7 @@ impl Module for ExampleModule {
 
         Ok(())
     }
-    fn create(
-        _ctx: &rm::Context,
-        _config: Self::Config,
-        stores: ModuleStores<Self>,
-    ) -> Result<Self, Self::Error> {
+    fn create(_ctx: &rm::Context, _config: Self::Config, stores: ModuleStores<Self>) -> Result<Self, Self::Error> {
         log::info!(target: "module", "create");
 
         let (store_task,) = stores;

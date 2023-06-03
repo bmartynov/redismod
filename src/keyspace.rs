@@ -1,7 +1,7 @@
 use std::ffi::c_int;
 
 use redis_module::Context;
-pub use redis_module::NotifyEvent;
+// pub use redis_module::NotifyEvent;
 
 use crate::Module;
 

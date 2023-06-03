@@ -1,4 +1,5 @@
-use std::{fmt::Debug, str, time};
+use std::fmt::Debug;
+use std::{str, time};
 
 use redis_module as rm;
 use redis_module::{NextArg, RedisError};

@@ -28,9 +28,7 @@ macro_rules! module {
 
         #[no_mangle]
         #[allow(non_snake_case)]
-        pub extern "C" fn RedisModule_OnUnload(
-            ctx: *mut $crate::rm::raw::RedisModuleCtx,
-        ) -> std::os::raw::c_int {
+        pub extern "C" fn RedisModule_OnUnload(ctx: *mut $crate::rm::raw::RedisModuleCtx) -> std::os::raw::c_int {
             $crate::on_unload::<$module>(ctx) as std::os::raw::c_int
         }
     };

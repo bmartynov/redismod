@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use redis_module as rm;
-
 use redismod::{IOLoader, IOSaver, Loader, Saver, Type};
 
 #[derive(Debug, Clone)]
@@ -84,18 +83,12 @@ impl Type for Task {
             xid::Id(bytes)
         };
 
-        let r#type = loader
-            .buffer()?
-            .to_string()
-            .map_err(rm::error::Error::FromUtf8)?;
+        let r#type = loader.buffer()?.to_string().map_err(rm::error::Error::FromUtf8)?;
 
         let retries = loader.unsigned()?;
 
         let timeout = Duration::from_millis(loader.unsigned()?);
-        let worker = loader
-            .buffer()?
-            .to_string()
-            .map_err(rm::error::Error::FromUtf8)?;
+        let worker = loader.buffer()?.to_string().map_err(rm::error::Error::FromUtf8)?;
 
         let payload = loader.buffer()?.as_ref().to_vec();
         let state = loader.unsigned()?.try_into()?;
